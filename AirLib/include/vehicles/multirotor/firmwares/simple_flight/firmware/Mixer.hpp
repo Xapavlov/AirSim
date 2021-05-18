@@ -20,15 +20,29 @@ public:
             motor_outputs.assign(params_->motor.motor_count, controls.throttle());
             return;
         }
-        
-        for (int motor_index = 0; motor_index < kMotorCount; ++motor_index) {
-            motor_outputs[motor_index] =
-                controls.throttle() * mixerQuadX[motor_index].throttle
-                + controls.pitch() * mixerQuadX[motor_index].pitch
-                + controls.roll() * mixerQuadX[motor_index].roll
-                + controls.yaw() * mixerQuadX[motor_index].yaw
-                ;
+
+        if (kMotorCount == 4) {
+            for (int motor_index = 0; motor_index < kMotorCount; ++motor_index) {
+                motor_outputs[motor_index] =
+                    controls.throttle() * mixerQuadX[motor_index].throttle
+                    + controls.pitch() * mixerQuadX[motor_index].pitch
+                    + controls.roll() * mixerQuadX[motor_index].roll
+                    + controls.yaw() * mixerQuadX[motor_index].yaw
+                    ;
+            }
         }
+        else if (kMotorCount == 8) {
+            for (int motor_index = 0; motor_index < kMotorCount; ++motor_index) {
+                motor_outputs[motor_index] =
+                    controls.throttle() * mixerQuadX8[motor_index].throttle
+                    + controls.pitch() * mixerQuadX8[motor_index].pitch
+                    + controls.roll() * mixerQuadX8[motor_index].roll
+                    + controls.yaw() * mixerQuadX8[motor_index].yaw
+                    ;
+            }
+        }
+
+
 
         float min_motor = *std::min_element(motor_outputs.begin(), motor_outputs.begin() + kMotorCount);
         if (min_motor < params_->motor.min_motor_output) {
@@ -50,7 +64,7 @@ public:
     }
 
 private:
-    const int kMotorCount = 4;
+    const int kMotorCount = 8;
 
     const Params* params_;
 
@@ -69,6 +83,17 @@ private:
         { 1.0f, 1.0f, 1.0f, -1.0f },          // FRONT_L
         { 1.0f, -1.0f, -1.0f, -1.0f },          // REAR_R
     };
+
+    const motorMixer_t mixerQuadX8[8] = { //QuadX8 config
+        { 1.0f, -1.0f, 1.0f, 1.0f },          // TOP_FRONT_R
+        { 1.0f, 1.0f, -1.0f, 1.0f },          // TOP_REAR_L
+        { 1.0f, 1.0f, 1.0f, -1.0f },          // TOP_FRONT_L
+        { 1.0f, -1.0f, -1.0f, -1.0f },        // TOP_REAR_R
+        { 1.0f, -1.0f, 1.0f, -1.0f },          // BOT_FRONT_R
+        { 1.0f, 1.0f, -1.0f, -1.0f },          // BOT_REAR_L
+        { 1.0f, 1.0f, 1.0f,  1.0f },          // BOT_FRONT_L
+        { 1.0f, -1.0f, -1.0f, 1.0f },        // BOT_REAR_R
+    }; //thrust 
 
 };
 

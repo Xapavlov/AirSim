@@ -137,6 +137,50 @@ protected: //static utility functions for derived classes to use
             throw std::invalid_argument("Rotor count other than 4 is not supported by this method!");
     }
 
+    static void initializeRotorQuadX8(vector<RotorPose>& rotor_poses /* the result we are building */,
+        uint rotor_count /* must be 8 */,
+        real_T arm_lengths[],
+        real_T rotor_z /* z relative to center of gravity */)
+    {
+        Vector3r unit_z(0, 0, -1);  //NED frame
+        if (rotor_count == 8) {
+            rotor_poses.clear();
+
+            /* Note: rotor_poses are built in this order:
+                 x-axis
+            cw (2)  |   (0)ccw
+            ccw(6)  |   (4)cw
+                    |
+               -------------- y-axis
+                    |
+                    |
+            ccw(1)  |   (3)cw
+            cw (5)      (7)ccw
+            */
+            // vectors below are rotated according to NED left hand rule (so the vectors are rotated counter clockwise).
+            Quaternionr quadx_rot(AngleAxisr(M_PIf / 4, unit_z));
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(0, arm_lengths[0], rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCCW);
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(0, -arm_lengths[1], rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCCW);
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(arm_lengths[2], 0, rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCW);
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(-arm_lengths[3], 0, rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCW);
+
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(0, arm_lengths[0], rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCCW);
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(0, -arm_lengths[1], rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCCW);
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(arm_lengths[2], 0, rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCW);
+            rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(-arm_lengths[3], 0, rotor_z), quadx_rot, true),
+                unit_z, RotorTurningDirection::RotorTurningDirectionCW);
+        }
+        else
+            throw std::invalid_argument("Rotor count other than 8 is not supported by this method!");
+    }
+
     static void initializeRotorHexX(vector<RotorPose>& rotor_poses /* the result we are building */,
         uint rotor_count /* must be 6 */,
         real_T arm_lengths[],
@@ -273,6 +317,88 @@ protected: //static utility functions for derived classes to use
 
         //computer rotor poses
         initializeRotorHexX(params.rotor_poses, params.rotor_count, arm_lengths.data(), rotor_z);
+
+        //compute inertia matrix
+        computeInertiaMatrix(params.inertia, params.body_box, params.rotor_poses, box_mass, motor_assembly_weight);
+    }
+
+    void setupFrameAirspeeder(Params& params)
+    {
+        /* Note: rotor_poses are built in this order:
+             x-axis
+        cw (2)  |   (0)ccw
+        ccw(6)  |   (4)cw
+                |
+        ----------------- y-axis
+                |
+        ccw(1)  |   (3)cw
+        cw (5)  |    (7)ccw
+        */
+
+        //set up arm lengths
+   
+        params.rotor_count = 8;
+        std::vector<real_T> arm_lengths;
+
+        Vector3r unit_z(0, 0, -1);  //NED frame
+
+        // relative to Forward vector in the order (0,3,1,2,4,7,5,6) required by quad X8 pattern
+        // http://ardupilot.org/copter/_images/MOTORS_QuadX_QuadPlus.jpg
+        arm_lengths.push_back(1.7513f);
+        arm_lengths.push_back(1.7475f);
+        arm_lengths.push_back(1.7513f);
+        arm_lengths.push_back(1.7475f);
+        arm_lengths.push_back(1.7513f);
+        arm_lengths.push_back(1.7475f);
+        arm_lengths.push_back(1.7513f);
+        arm_lengths.push_back(1.7475f);
+
+        // note: the Forward vector is actually the "x" axis, and the AngleAxisr rotation is pointing down and is left handed, so this means the rotation
+        // is counter clockwise, so the vector (arm_lengths[i], 0) is the X-axis, so the CCW rotations to position each arm correctly are listed below:
+        std::vector<real_T> arm_angles;
+        arm_angles.push_back(-32.25f);
+        arm_angles.push_back(147.75f);
+        arm_angles.push_back(32.25f);
+        arm_angles.push_back(-147.75f);
+        arm_angles.push_back(-32.25f);
+        arm_angles.push_back(147.75f);
+        arm_angles.push_back(32.25f);
+        arm_angles.push_back(-147.75f);
+
+        // quad X pattern
+        std::vector<RotorTurningDirection> rotor_directions;
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCCW);
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCCW);
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCW);
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCW);
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCW);
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCW);
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCCW);
+        rotor_directions.push_back(RotorTurningDirection::RotorTurningDirectionCCW);
+
+       //set up mass
+        params.mass = 0.01f * 150.0f; //can be varied from 0.800 to 1.600
+        real_T motor_assembly_weight = 0.02f;  // weight for TBS motors
+        real_T box_mass = params.mass - params.rotor_count * motor_assembly_weight;
+
+        
+        params.rotor_params.C_T =     0.01f * 0.0923f;
+        params.rotor_params.C_P = 2 * 0.01f * 0.0214f;
+        params.rotor_params.propeller_diameter = 0.813f;
+        params.rotor_params.max_rpm = 5400;
+        params.rotor_params.calculateMaxThrust();
+
+        //set up dimensions of core body box or abdomen (not including arms).
+        params.body_box.x() = 1.60f; params.body_box.y() = 0.8f; params.body_box.z() = 0.4f;
+        real_T rotor_z = 0;
+
+        //computer rotor poses
+        params.rotor_poses.clear();
+        for (uint i = 0; i < 8; i++)
+        {
+            Quaternionr angle(AngleAxisr(arm_angles[i] * M_PIf / 180, unit_z));
+            params.rotor_poses.emplace_back(VectorMath::rotateVector(Vector3r(arm_lengths[i], 0, rotor_z), angle, true), unit_z, rotor_directions[i]);
+        };
 
         //compute inertia matrix
         computeInertiaMatrix(params.inertia, params.body_box, params.rotor_poses, box_mass, motor_assembly_weight);

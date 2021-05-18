@@ -84,9 +84,9 @@ void AFlyingPawn::setRotorSpeed(const std::vector<MultirotorPawnEvents::RotorAct
     for (auto rotor_index = 0; rotor_index < rotor_infos.size(); ++rotor_index) {
         auto comp = rotating_movements_[rotor_index];
         if (comp != nullptr) {
-            comp->RotationRate.Yaw = 
+            comp->RotationRate.Yaw =
                 rotor_infos.at(rotor_index).rotor_speed * rotor_infos.at(rotor_index).rotor_direction *
-                180.0f / M_PIf * RotatorFactor;
+                180.0f / M_PIf * RotatorFactor * (rotor_index > 3 ? -1 : 1);
         }
     }
 }
